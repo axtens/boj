@@ -1,0 +1,234 @@
+﻿AppType=JavaFX
+Build1=Default,b4j.example
+File1=Joblog.fxml
+FileGroup1=Default Group
+Group=Default Group
+Library1=jcore
+Library2=jfx
+Library3=javaobject
+Library4=jmsgboxes
+Library5=db2000.b4j.extrafunctions
+NumberOfFiles=1
+NumberOfLibraries=5
+NumberOfModules=0
+Version=7.8
+@EndOfDesignText@
+#Region  Project Attributes 
+	#MainFormWidth: 715
+	#MainFormHeight: 400 
+#End Region
+
+Sub Process_Globals
+	Private fx As JFX
+	Private MainForm As Form
+	Private apMain As AnchorPane
+	Private bCancel As Button
+	Private bSave As Button
+	Private heLog As HTMLEditor
+	Private cbDepartment As ComboBox
+	Private mb As Msgboxes
+	Private ox, oy As Double
+	Private ini As fINI 
+	Private s As String
+	
+	Public gsDepartment As String
+	Public gsDefaultHTML As String = "<html dir=""ltr""><head></head><body contenteditable=""true""></body></html>"
+	Public gsFolder As String 
+	Public gsFile As String= "joblog-$d.html"
+	Public gbIncludeClipboard As Boolean
+End Sub
+
+Sub AppStart (Form1 As Form, Args() As String)
+	gsFolder = File.DirData("BOJ")
+	MainForm = Form1
+	MainForm.RootPane.LoadLayout("Joblog")
+	MainForm.SetFormStyle("UNDECORATED")
+	ini.SetFileName(File.Combine(gsFolder,"JobLog.ini"))
+	Dim sDepartments As String
+	sDepartments = ini.rdString("Settings","Departments")
+	If sDepartments = Null Then
+		sDepartments = "HOME *WORK OTHER"
+		ini.wrString("Settings","Departments",sDepartments,"Standard Departments")
+		ini.wrBoolean("Settings","IncludeClipboard", False,"Include Clipboard?")
+		ini.UpDate
+	End If
+	Dim aDepartments() As String
+	aDepartments = Regex.Split(" ", sDepartments)
+	Dim i As Int
+	Dim s As String
+	For i = 0 To aDepartments.Length-1
+		s = aDepartments(i)
+		If s.CharAt(0) = "*" Then
+			gsDepartment = s.SubString(1)
+			cbDepartment.Items.Add(s.SubString(1))
+			cbDepartment.SelectedIndex = i
+		Else
+			cbDepartment.Items.Add(s)
+		End If
+	Next
+
+	gbIncludeClipboard = ini.rdBoolean("Settings", "IncludeClipboard")
+	
+	setFormAlwaysOnTop(MainForm,True)
+	
+	If gbIncludeClipboard = True Then
+		If fx.Clipboard.HasString = True Then
+			heLog.HtmlText = fx.Clipboard.GetString 'EscapeURL
+		Else
+			If fx.Clipboard.HasFiles Then
+				'mb.Show("Cannot paste files yet.", "JobLog")
+				'heLog.HtmlText = fx.Clipboard.GetFiles
+			Else If fx.Clipboard.HasImage Then
+				'mb.Show("Cannot paste images yet.", "JobLog")
+				'heLog.HtmlText = fx.Clipboard.GetImage
+			End If
+		End If
+	End If
+	
+	MainForm.Show
+End Sub
+
+Sub MainForm_CloseRequest (EventData As Event)
+  	bCancel_Action 
+End Sub
+
+Sub MainForm_MousePressed (EventData As MouseEvent)
+   ox = EventData.X
+   oy = EventData.Y
+End Sub
+
+Sub MainForm_MouseDragged (EventData As MouseEvent)
+   Dim jo As JavaObject = EventData
+   MainForm.WindowLeft = jo.RunMethod("getScreenX", Null) - ox
+   MainForm.WindowTop = jo.RunMethod("getScreenY", Null) - oy
+End Sub
+
+Sub FormatNow(format As String) As String
+	Dim saveFormat As String = DateTime.DateFormat
+	DateTime.DateFormat = format
+	Dim sDate As String = DateTime.date(DateTime.Now)
+	DateTime.DateFormat = saveFormat
+	Return sDate
+End Sub
+
+Sub SaveLog(sDepartment As String, sText As String)
+	Dim os As OutputStream
+	Dim tw As TextWriter
+	
+	Dim f As String = gsFile.Replace("$d",FormatNow("yyyyMMdd"))
+	If File.Exists(gsFolder, f) = False Then
+		os = File.OpenOutput(gsFolder,f,False)
+		tw.Initialize(os)
+		tw.Write("<html><head><title>JobLog</title></head><body>")
+		tw.Close
+	End If
+	os = File.OpenOutput(gsFolder, f, True)
+	tw.Initialize(os)
+	tw.Write("<div><h1>" & sDepartment & " " & FormatNow("yyyy-MM-dd'T'HH:mm:ss") & "</h1>" & (sText) & "</div><hr>")
+	tw.Close()
+
+End Sub
+
+Sub bSave_Action
+	Dim sText As String
+	sText = heLog.HtmlText
+	sText = TopAndTail(sText, gsDefaultHTML)
+	SaveLog(gsDepartment, sText)
+	Dim sDepartments As String = ""
+	Dim sDepartment As String = ""
+	Dim i As Int
+	Dim c As Int = cbDepartment.Items.Size - 1 
+	For i = 0 To c
+		sDepartment = cbDepartment.Items.Get(i)
+		If sDepartment = gsDepartment Then
+			sDepartments = sDepartments & "*" & sDepartment
+		Else
+			sDepartments = sDepartments & sDepartment
+		End If
+		If i < c Then
+			sDepartments = sDepartments & " "
+		End If
+	Next
+	ini.wrString("Settings","Departments",sDepartments,"")
+	ini.UpDate
+	MainForm.Close
+End Sub
+
+Sub bCancel_Action
+	'if log is dirty, query close
+	If heLog.HtmlText <> gsDefaultHTML Then
+		Dim o As Int
+		setFormAlwaysOnTop(MainForm,False)
+		o = mb.Show2("Log text was changed. Are you sure you want to cancel?", "", "Yes", "", "No")
+		setFormAlwaysOnTop(MainForm,True)
+		If o = -2 Then
+			Return
+		End If
+	End If
+	SaveLog(gsDepartment, "") 'log that fact that you cancelled
+	MainForm.Close
+	ini.UpDate
+	Return
+End Sub
+
+Sub cbDepartment_ValueChanged (Value As Object)
+	gsDepartment = Value	
+End Sub
+
+Sub TopAndTail(sHaystack As String, sNeedle As String) As String
+	Dim i As Int
+	Dim j As Int
+	Dim k As Int
+	For i = 0 To sNeedle.Length-1
+		j = i
+		If sNeedle.CharAt(i) <> sHaystack.CharAt(i) Then
+			Exit
+		End If
+	Next
+	If j = sNeedle.Length - 1 Then
+		Return ""
+	End If
+	k = sHaystack.Length-1
+	For i = sNeedle.Length-1 To 0 Step -1
+		If sNeedle.CharAt(i) <> sHaystack.CharAt(k) Then
+			Exit
+		End If
+		k = k - 1
+	Next
+	'Log(j & " " & k)
+	If j <> k+1 Then
+		sHaystack = sHaystack.SubString(j-1)
+		sHaystack = sHaystack.SubString2(0,k-j+1)
+	End If
+	Return sHaystack	
+End Sub
+
+Sub setFormAlwaysOnTop(frm As Object, Value As Boolean)
+    Dim joForm As JavaObject = frm
+    Dim stage As JavaObject = joForm.GetField("stage")
+    stage.RunMethod("setAlwaysOnTop", Array(Value))
+End Sub
+
+Public Sub EscapeXml(Raw As String) As String
+  Dim sb As StringBuilder
+  sb.Initialize
+  For i = 0 To Raw.Length - 1
+    Dim c As Char = Raw.CharAt(i)
+    Select c
+      Case QUOTE
+        sb.Append("&quot;")
+      Case "'"
+        sb.Append("&apos;")
+      'Case "<"
+      '  sb.Append("&lt;")
+      'Case ">"
+      '  sb.Append("&gt;")
+      Case "&"
+        sb.Append("&amp;")
+      Case Else
+        sb.Append(c)
+    End Select
+  Next
+  Return sb.ToString
+End Sub
+

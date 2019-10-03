@@ -1,0 +1,14 @@
+Thu 04/12/2014 10:48:48.91:
+	make sure HTML shows day of week
+Thu 04/12/2014 10:49:02.37:
+	log to html with text in a div
+Fri 12/12/2014 11:37:16.44:
+	Upgraded to B4J 5.2
+Fri 12/12/2014 11:37:37.82:
+	Cancels are logged
+Fri 19/12/2014 10:18:13.95:
+	change output from joblog.html to joblog-yyyymmdd.html as single file gets very big
+Fri 19/12/2014 10:19:19.41:
+	DateTime.DateFormat = "dd.MM.yyyy HH:mm"
+Fri 19/12/2014 10:19:32.60:
+	DateTime.Date(DateTime.Now)
