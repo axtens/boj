@@ -9,7 +9,7 @@ HOME, WORK or OTHER) and enters text into an HtmlEdit control. The date, the "de
 and the entered text are appended to an HTML log file.
  
 The jar, the log and an ini defining the "departments" are stored together. In the 
-author's case, these files are stored in %APPDATA%\Roaming\BOJ
+author's case, these files are stored in %APPDATA%\BOJ
 
 In the ini file, the default "department" is prefixed with an asterisk.
 
